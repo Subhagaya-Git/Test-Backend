@@ -1,83 +1,45 @@
 <!DOCTYPE html>
-<html lang="si">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPS Tracker - Test Mode</title>
+    <title>GPS Tracker - Simple Mode</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        body { font-family: sans-serif; margin: 0; text-align: center; background: #f4f4f4; }
-        #map { height: 70vh; width: 100%; }
-        .controls { padding: 20px; }
-        button { padding: 12px; margin: 5px; cursor: pointer; border-radius: 5px; border: none; font-weight: bold; }
-        .btn-live { background: #28a745; color: white; }
-        .btn-test { background: #0078d4; color: white; }
-    </style>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>#map { height: 80vh; width: 100%; }</style>
 </head>
 <body>
-
     <div id="map"></div>
-    <div class="controls">
-        <button class="btn-live" onclick="startTracking()">🚀 Start Real GPS</button>
-        <button class="btn-test" onclick="sendTestData()">🧪 Send Test Location (Colombo)</button>
-        <p id="status">තත්ත්වය: සම්බන්ධ වෙමින්...</p>
-    </div>
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.min.js"></script>
+    <button onclick="startTracking()">🚀 Start My Tracking</button>
+    <p id="status">Status: Ready</p>
 
     <script>
-       // මෙය නිවැරදිව පරීක්ෂා කර බලන්න
-const API_BASE = "https://my-unique-gps-tracker-01-c9csdeb3cjbmb8fq.southeastasia-01.azurewebsites.net/api";
-        var map = L.map('map').setView([6.9271, 79.8612], 12); 
+        const API_URL = "https://my-unique-gps-tracker-01-c9csdeb3cjbmb8fq.southeastasia-01.azurewebsites.net/api/GetGPSData";
+        var map = L.map('map').setView([7.8731, 80.7718], 7);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        var markers = {};
+        var marker = L.marker([0, 0]).addTo(map);
 
-        const connection = new signalr.HubConnectionBuilder()
-            .withUrl(API_BASE).withAutomaticReconnect().build();
+        // සෑම තත්පර 3 කට වරක්ම Server එකෙන් දත්ත ලබා ගැනීම
+        setInterval(async () => {
+            try {
+                const res = await fetch(API_URL);
+                const data = await res.json();
+                if(data.lat) {
+                    marker.setLatLng([data.lat, data.lon]);
+                    map.setView([data.lat, data.lon]);
+                    document.getElementById("status").innerText = "Last Update: " + new Date().toLocaleTimeString();
+                }
+            } catch (e) { console.log("Waiting for data..."); }
+        }, 3000);
 
-        connection.on("newLocation", (data) => {
-            const { deviceId, lat, lon } = data;
-            if (markers[deviceId]) {
-                markers[deviceId].setLatLng([lat, lon]);
-            } else {
-                markers[deviceId] = L.marker([lat, lon]).addTo(map).bindPopup(deviceId).openPopup();
-            }
-            map.setView([lat, lon], 14);
-        });
-
-        connection.start().then(() => {
-            document.getElementById("status").innerText = "Server Connected ✅";
-        }).catch(e => console.error(e));
-
-        // සැබෑ GPS වැඩ කරන්නේ නැතිනම් මේ බොත්තමෙන් පරීක්ෂා කරන්න
-        async function sendTestData() {
-            const testPayload = {
-                deviceId: "Test-User",
-                lat: 6.9271, // කොළඹ පිහිටීම
-                lon: 79.8612
-            };
-            await fetch(`${API_BASE}/GetGPSData`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(testPayload)
-            });
-        }
-
+        // දුරකථනයෙන් දත්ත යැවීම
         async function startTracking() {
-            if (!navigator.geolocation) return alert("No GPS support");
             navigator.geolocation.watchPosition(async (pos) => {
-                const payload = {
-                    deviceId: "My-Phone",
-                    lat: pos.coords.latitude,
-                    lon: pos.coords.longitude
-                };
-                await fetch(`${API_BASE}/GetGPSData`, {
+                const payload = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+                await fetch(API_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(payload),
+                    headers: { 'Content-Type': 'application/json' }
                 });
-            }, (e) => alert("GPS Permission Denied. Try 'Send Test Location' button."), { enableHighAccuracy: true });
+            }, null, { enableHighAccuracy: true });
         }
     </script>
 </body>
