@@ -31,27 +31,22 @@
 
 <div class="controls">
     <button onclick="startTracking()">🚀 Start Live Tracking</button>
-    <p id="status">Statues: Connecting...</p>
+    <p id="status">Status: Connecting...</p>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
 
-    // 🔥 KEEP FIREBASE FOR READING ONLY
     const FIREBASE_HISTORY_URL = "https://my-gps-tracker-5c44b-default-rtdb.asia-southeast1.firebasedatabase.app/history.json";
 
-    // 🔥 ADD AZURE API (WRITE PATH)
     const API_URL = "https://<your-azure-app>.azurewebsites.net/api/GetGPSData";
 
     var map = L.map('map').setView([7.8731, 80.7718], 7);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    // 🔥 FIX marker init
     var marker = null;
-
-    var pathLine = L.polyline([], {color: 'red', weight: 5}).addTo(map);
 
     setInterval(async () => {
         try {
@@ -59,30 +54,20 @@
             const data = await response.json();
 
             if (data) {
-                let pathPoints = [];
-                let lastPos = null;
 
-                // 🔥 FIX: SORT BY TIME (VERY IMPORTANT)
-                Object.values(data)
-                    .sort((a, b) => new Date(a.time) - new Date(b.time))
-                    .forEach(point => {
-                        let coords = [point.lat, point.lon];
-                        pathPoints.push(coords);
-                        lastPos = coords;
-                    });
+                // 🔥 ONLY GET LATEST POINT (no path)
+                let latest = Object.values(data)
+                    .sort((a, b) => new Date(b.time) - new Date(a.time))[0];
 
-                if (lastPos) {
+                if (latest) {
+                    let lastPos = [latest.lat, latest.lon];
 
-                    // 🔥 FIX marker creation/update
                     if (!marker) {
                         marker = L.marker(lastPos).addTo(map).bindPopup("I'm here!");
                     } else {
                         marker.setLatLng(lastPos);
                     }
 
-                    pathLine.setLatLngs(pathPoints);
-
-                    // 🔥 smoother movement
                     map.setView(lastPos, 16);
 
                     document.getElementById("status").innerText =
@@ -111,7 +96,6 @@
                 time: new Date().toISOString()
             };
 
-            // 🔥 FIX: SEND TO AZURE (NOT FIREBASE)
             await fetch(API_URL, {
                 method: 'POST',
                 headers: {
